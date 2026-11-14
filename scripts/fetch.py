@@ -153,9 +153,9 @@ def twse_day(d):
     f, rows = find_table(js, "證券代號", "投信")
     if f:
         ic = col(f, "證券代號")
-        ifo = first(col(f, "外陸資買賣超股數", avoid=["自營商"]), col(f, "外資", "買賣超", avoid=["自營商"]))
+        ifo = first(col(f, "外陸資買賣超股數"), col(f, "外資", "買賣超", prefer="不含"))
         itr = col(f, "投信買賣超")
-        ide = first(col(f, "自營商買賣超股數", avoid=["自行", "避險"]), col(f, "自營商", "買賣超"))
+        ide = first(col(f, "自營商買賣超股數", avoid=["自行", "避險", "外資"]), col(f, "自營商", "買賣超", avoid=["外資"]))
         for r in rows:
             code = clean(r[ic])
             if code in out:
@@ -179,8 +179,12 @@ def twse_day(d):
 def tpex_day(d):
     ds = d.strftime("%Y/%m/%d")
     out = {}
-    js = get("https://www.tpex.org.tw/www/zh-tw/afterTrading/dailyQ",
-             {"date": ds, "type": "EW", "response": "json"})
+    roc = f"{d.year - 1911}/{d:%m/%d}"
+    js = get("https://www.tpex.org.tw/web/stock/aftertrading/daily_close_quotes/stk_quote_result.php",
+             {"l": "zh-tw", "d": roc, "se": "EW", "o": "json"})
+    if not find_table(js, "代號", "收盤")[0]:
+        js = get("https://www.tpex.org.tw/www/zh-tw/afterTrading/otc",
+                 {"date": ds, "type": "EW", "response": "json"})
     f, rows = find_table(js, "代號", "收盤")
     if not f:
         return {}
@@ -198,12 +202,12 @@ def tpex_day(d):
                      "l": num(r[il]), "c": c, "v": num(r[iv]) if iv is not None else 0}
     js = get("https://www.tpex.org.tw/www/zh-tw/insti/dailyTrade",
              {"type": "Daily", "sect": "EW", "date": ds, "response": "json"})
-    f, rows = find_table(js, "代號", "投信")
+    f, rows = find_table(js, "代號", "買賣超股數")
     if f:
         ic = col(f, "代號")
-        ifo = first(col(f, "外資及陸資", "買賣超", prefer="不含"), col(f, "外資", "買賣超"))
-        itr = col(f, "投信", "買賣超")
-        ide = col(f, "自營商", "買賣超", prefer="合計")
+        # 欄位名稱重複，依位置：外資(不含外資自營商)、外資自營商、外資合計、投信、自營商自行、自營商避險、自營商合計
+        occ = [i for i, x in enumerate(f) if "買賣超股數" in clean(x) and "合計" not in clean(x)]
+        ifo, itr, ide = (occ[0], occ[3], occ[6]) if len(occ) >= 7 else (None, None, None)
         for r in rows:
             code = clean(r[ic])
             if code in out:
