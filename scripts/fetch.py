@@ -319,9 +319,9 @@ def main():
             with open(os.path.join(ROOT, "data", "fund.json"), "w", encoding="utf-8") as fp:
                 json.dump(fund, fp, ensure_ascii=False, separators=(",", ":"))
             log(f"基本面 {len(fund)} 檔")
-    # 只保留最近 200 個檔案
+    # 只保留最近 260 個檔案（約一年）
     files = sorted(os.listdir(HIST))
-    for fn in files[:-200]:
+    for fn in files[:-260]:
         os.remove(os.path.join(HIST, fn))
     log(f"完成，新增 {got} 個交易日")
 

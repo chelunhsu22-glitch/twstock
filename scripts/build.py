@@ -8,7 +8,7 @@ import numpy as np
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 HIST = os.path.join(ROOT, "data", "history")
 OUT = os.path.join(ROOT, "docs", "data", "latest.json")
-LOOKBACK = 130
+LOOKBACK = 250
 SPARK = 60
 
 
@@ -81,8 +81,24 @@ def main():
         with open(fp_, encoding="utf-8") as fp:
             fund = json.load(fp)
 
+    kdir = os.path.join(ROOT, "docs", "data", "k")
+    os.makedirs(kdir, exist_ok=True)
+    dates = [f"{d[:4]}-{d[4:6]}-{d[6:]}" for d, _ in days]
     stocks = []
     for code, cur in last.items():
+        # 每檔的日K資料（給網頁畫 K 線、KD、MACD 等）
+        k = {"t": [], "o": [], "h": [], "l": [], "c": [], "v": [], "f": [], "tr": [], "dl": []}
+        for dstr, (_, dd) in zip(dates, days):
+            x = dd.get(code)
+            if not x:
+                continue
+            k["t"].append(dstr); k["c"].append(x["c"])
+            k["o"].append(x.get("o") or x["c"]); k["h"].append(x.get("h") or x["c"]); k["l"].append(x.get("l") or x["c"])
+            k["v"].append(round((x.get("v") or 0) / 1000))
+            for a, b in (("f", "f"), ("tr", "t"), ("dl", "d")):
+                k[a].append(round(x[b] / 1000) if x.get(b) is not None else None)
+        with open(os.path.join(kdir, code + ".json"), "w", encoding="utf-8") as fp:
+            json.dump(k, fp, separators=(",", ":"))
         seq = [dd[code] for _, dd in days if code in dd]
         if len(seq) < 2:
             continue
