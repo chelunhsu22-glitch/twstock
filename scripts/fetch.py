@@ -284,6 +284,25 @@ def fundamentals(d):
     return fund
 
 
+def looks_stale(d, part):
+    """與最接近的另一個已存交易日比較，若超過 80% 個股收盤價完全相同則視為異常。"""
+    me = d.strftime("%Y%m%d")
+    others = [f for f in sorted(os.listdir(HIST)) if f.endswith(".json") and f[:8] != me]
+    if not others:
+        return False
+    near = min(others, key=lambda f: abs((dt.datetime.strptime(f[:8], "%Y%m%d").date() - d).days))
+    try:
+        with open(os.path.join(HIST, near), encoding="utf-8") as fp:
+            prev = json.load(fp)
+    except Exception:
+        return False
+    common = [k for k in part if k in prev]
+    if len(common) < 50:
+        return False
+    same = sum(part[k]["c"] == prev[k]["c"] for k in common)
+    return same / len(common) > 0.8
+
+
 def fetch_date(d):
     log(f"== {d:%Y-%m-%d} ==")
     a = twse_day(d)
@@ -292,6 +311,13 @@ def fetch_date(d):
     log(f"  上櫃 {len(b)} 檔")
     if not a and not b:
         log("  無資料（休市或尚未公布）")
+        return False
+    # 防呆：若某市場收盤價與其他交易日幾乎完全相同，代表網站忽略了日期，丟棄該市場資料
+    for mk, part in (("上市", a), ("上櫃", b)):
+        if part and looks_stale(d, part):
+            log(f"  ⚠ {mk}資料與其他交易日幾乎相同，疑似網站忽略日期，丟棄")
+            part.clear()
+    if not a and not b:
         return False
     a.update(b)
     with open(os.path.join(HIST, d.strftime("%Y%m%d") + ".json"), "w", encoding="utf-8") as fp:
