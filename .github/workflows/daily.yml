@@ -24,7 +24,7 @@ concurrency:
 jobs:
   update:
     runs-on: ubuntu-latest
-    timeout-minutes: 120
+    timeout-minutes: 340
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-python@v5
@@ -35,9 +35,7 @@ jobs:
         run: |
           BF="${{ github.event.inputs.backfill }}"
           N=$(ls data/history/*.json 2>/dev/null | wc -l)
-          if [ "$N" -lt 60 ] && { [ -z "$BF" ] || [ "$BF" = "0" ]; }; then
-            echo "歷史資料只有 $N 天，自動回補 120 天"; BF=120
-          elif [ "$N" -lt 200 ] && { [ -z "$BF" ] || [ "$BF" = "0" ]; }; then
+          if [ "$N" -lt 200 ] && { [ -z "$BF" ] || [ "$BF" = "0" ]; }; then
             echo "歷史資料 $N 天，延伸回補至一年（已有的日期會略過）"; BF=380
           fi
           if [ -n "$BF" ] && [ "$BF" != "0" ]; then

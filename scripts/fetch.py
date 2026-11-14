@@ -103,6 +103,14 @@ def tables(js):
     return out
 
 
+def same_day(js, d):
+    """確認回傳資料的日期就是要求的日期（避免網站忽略日期參數）。"""
+    if not isinstance(js, dict):
+        return False
+    rd = re.sub(r"\D", "", str(js.get("date") or js.get("reportDate") or ""))
+    return rd == "" or rd == d.strftime("%Y%m%d")
+
+
 def find_table(js, *must):
     for f, d in tables(js):
         if all(col(f, m) is not None for m in must):
@@ -130,7 +138,7 @@ def twse_day(d):
     out = {}
     js = get("https://www.twse.com.tw/rwd/zh/afterTrading/MI_INDEX",
              {"date": ds, "type": "ALLBUT0999", "response": "json"})
-    if not js or js.get("stat") not in (None, "OK"):
+    if not js or js.get("stat") not in (None, "OK") or not same_day(js, d):
         return {}
     f, rows = find_table(js, "證券代號", "收盤價")
     if not f:
@@ -179,12 +187,11 @@ def twse_day(d):
 def tpex_day(d):
     ds = d.strftime("%Y/%m/%d")
     out = {}
-    roc = f"{d.year - 1911}/{d:%m/%d}"
-    js = get("https://www.tpex.org.tw/web/stock/aftertrading/daily_close_quotes/stk_quote_result.php",
-             {"l": "zh-tw", "d": roc, "se": "EW", "o": "json"})
-    if not find_table(js, "代號", "收盤")[0]:
-        js = get("https://www.tpex.org.tw/www/zh-tw/afterTrading/otc",
-                 {"date": ds, "type": "EW", "response": "json"})
+    # 注意：舊版 stk_quote_result.php 會忽略日期、永遠回傳最新一天，不能用
+    js = get("https://www.tpex.org.tw/www/zh-tw/afterTrading/otc",
+             {"date": ds, "type": "EW", "response": "json"})
+    if not same_day(js, d):
+        return {}
     f, rows = find_table(js, "代號", "收盤")
     if not f:
         return {}
@@ -202,7 +209,7 @@ def tpex_day(d):
                      "l": num(r[il]), "c": c, "v": num(r[iv]) if iv is not None else 0}
     js = get("https://www.tpex.org.tw/www/zh-tw/insti/dailyTrade",
              {"type": "Daily", "sect": "EW", "date": ds, "response": "json"})
-    f, rows = find_table(js, "代號", "買賣超股數")
+    f, rows = find_table(js, "代號", "買賣超股數") if same_day(js, d) else (None, None)
     if f:
         ic = col(f, "代號")
         # 欄位名稱重複，依位置：外資(不含外資自營商)、外資自營商、外資合計、投信、自營商自行、自營商避險、自營商合計
@@ -216,7 +223,7 @@ def tpex_day(d):
                 out[code]["d"] = num(r[ide]) if ide is not None else None
     js = get("https://www.tpex.org.tw/www/zh-tw/margin/balance",
              {"date": ds, "response": "json"})
-    f, rows = find_table(js, "代號", "資餘額")
+    f, rows = find_table(js, "代號", "資餘額") if same_day(js, d) else (None, None)
     if f:
         ic = col(f, "代號")
         im = col(f, "資餘額", avoid=["前資", "前日"])
