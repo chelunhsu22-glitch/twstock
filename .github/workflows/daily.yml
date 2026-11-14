@@ -4,6 +4,9 @@ on:
   schedule:
     # 台北時間週一至週五 21:40（UTC 13:40），此時法人與融資資料都已公布
     - cron: "40 13 * * 1-5"
+  push:
+    branches: [main]
+    paths: [".github/workflows/**", "scripts/**"]
   workflow_dispatch:
     inputs:
       backfill:
@@ -31,6 +34,10 @@ jobs:
       - name: 抓取資料
         run: |
           BF="${{ github.event.inputs.backfill }}"
+          N=$(ls data/history/*.json 2>/dev/null | wc -l)
+          if [ "$N" -lt 60 ] && { [ -z "$BF" ] || [ "$BF" = "0" ]; }; then
+            echo "歷史資料只有 $N 天，自動回補 120 天"; BF=120
+          fi
           if [ -n "$BF" ] && [ "$BF" != "0" ]; then
             python scripts/fetch.py --backfill "$BF"
           else
@@ -44,4 +51,5 @@ jobs:
           git config user.email "github-actions@users.noreply.github.com"
           git add data docs/data
           git diff --cached --quiet || git commit -m "資料更新 $(TZ=Asia/Taipei date +%F)"
+          git pull --rebase -q || true
           git push
