@@ -15,6 +15,7 @@ import requests
 
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 HIST = os.path.join(ROOT, "data", "history")
+SKIPF = os.path.join(ROOT, "data", "holidays.txt")  # 回補時查無資料的日期（休市），下次略過
 os.makedirs(HIST, exist_ok=True)
 
 S = requests.Session()
@@ -307,9 +308,13 @@ def main():
     ap.add_argument("--date")
     ap.add_argument("--backfill", type=int, default=0)
     ap.add_argument("--skip-fund", action="store_true")
+    ap.add_argument("--max-new", type=int, default=0, help="回補時最多新增幾個交易日就停止（分段存檔用）")
     a = ap.parse_args()
     today = dt.datetime.strptime(a.date, "%Y%m%d").date() if a.date else taipei_today()
     got = 0
+    skip = set()
+    if os.path.exists(SKIPF):
+        skip = {dt.datetime.strptime(x.strip(), "%Y%m%d").date() for x in open(SKIPF) if x.strip()}
     if a.backfill:
         for i in range(a.backfill, -1, -1):
             d = today - dt.timedelta(days=i)
@@ -317,7 +322,16 @@ def main():
                 continue
             if os.path.exists(os.path.join(HIST, d.strftime("%Y%m%d") + ".json")):
                 continue
-            got += fetch_date(d)
+            if d in skip:
+                continue
+            ok = fetch_date(d)
+            got += ok
+            if not ok and d < today - dt.timedelta(days=3):
+                skip.add(d)
+                with open(SKIPF, "a") as fp:
+                    fp.write(d.strftime("%Y%m%d") + "\n")
+            if a.max_new and got >= a.max_new:
+                break
     elif today.weekday() < 5:
         got += fetch_date(today)
     if not a.skip_fund:
@@ -331,6 +345,8 @@ def main():
     for fn in files[:-260]:
         os.remove(os.path.join(HIST, fn))
     log(f"完成，新增 {got} 個交易日")
+    with open(os.path.join(ROOT, "data", ".new_days"), "w") as fp:
+        fp.write(str(got))
 
 
 if __name__ == "__main__":

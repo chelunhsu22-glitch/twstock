@@ -36,20 +36,17 @@ jobs:
           BF="${{ github.event.inputs.backfill }}"
           N=$(ls data/history/*.json 2>/dev/null | wc -l)
           if [ "$N" -lt 200 ] && { [ -z "$BF" ] || [ "$BF" = "0" ]; }; then
-            echo "歷史資料 $N 天，延伸回補至一年（已有的日期會略過）"; BF=380
+            echo "歷史資料 $N 天，回補至一年（已有的日期會略過，每 50 天存檔一次）"; BF=380
           fi
           if [ -n "$BF" ] && [ "$BF" != "0" ]; then
-            python scripts/fetch.py --backfill "$BF"
-          else
-            python scripts/fetch.py
+            for i in $(seq 1 8); do
+              python scripts/fetch.py --backfill "$BF" --max-new 50 --skip-fund
+              scripts/save.sh "回補歷史資料（第 $i 段）"
+              [ "$(cat data/.new_days)" -lt 50 ] && break
+            done
           fi
+          python scripts/fetch.py
       - name: 計算指標
         run: python scripts/build.py
       - name: 存回儲存庫
-        run: |
-          git config user.name "github-actions"
-          git config user.email "github-actions@users.noreply.github.com"
-          git add data docs/data
-          git diff --cached --quiet || git commit -m "資料更新 $(TZ=Asia/Taipei date +%F)"
-          git pull --rebase -q || true
-          git push
+        run: scripts/save.sh "資料更新 $(TZ=Asia/Taipei date +%F)"
