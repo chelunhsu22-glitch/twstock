@@ -1,0 +1,285 @@
+<!DOCTYPE html>
+<html lang="zh-Hant">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<meta name="theme-color" content="#0f1419">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-title" content="台股選股">
+<link rel="manifest" href="manifest.json">
+<title>台股三維選股</title>
+<style>
+:root{--bg:#0f1419;--card:#182029;--line:#2a3542;--tx:#e6edf3;--mu:#8b98a5;--up:#ef4444;--dn:#22c55e;--ac:#f5b942;--bl:#60a5fa}
+@media (prefers-color-scheme:light){:root{--bg:#f6f7f9;--card:#fff;--line:#e3e7ec;--tx:#14181f;--mu:#5d6b7a;--ac:#c98a00;--bl:#2563eb}}
+*{box-sizing:border-box}body{margin:0;background:var(--bg);color:var(--tx);font:15px/1.55 -apple-system,"PingFang TC","Noto Sans TC","Microsoft JhengHei",sans-serif}
+header{padding:14px 16px 0;max-width:1100px;margin:auto}h1{font-size:20px;margin:0}.sub{color:var(--mu);font-size:13px}
+nav{display:flex;gap:6px;overflow-x:auto;padding:10px 16px;max-width:1100px;margin:auto;position:sticky;top:0;background:var(--bg);z-index:5}
+nav button{flex:none;border:1px solid var(--line);background:var(--card);color:var(--tx);padding:7px 13px;border-radius:999px;font-size:14px;cursor:pointer}
+nav button.on{background:var(--ac);color:#111;border-color:var(--ac);font-weight:600}
+main{max-width:1100px;margin:auto;padding:0 16px 40px}
+.card{background:var(--card);border:1px solid var(--line);border-radius:12px;padding:14px;margin:12px 0}
+.grid{display:grid;gap:12px;grid-template-columns:repeat(auto-fill,minmax(300px,1fr))}
+.g3{display:grid;gap:8px;grid-template-columns:repeat(auto-fill,minmax(140px,1fr))}
+.row{display:flex;justify-content:space-between;align-items:center;gap:8px}
+.mu{color:var(--mu);font-size:13px}.big{font-size:22px;font-weight:700}
+.up{color:var(--up)}.dn{color:var(--dn)}
+.tag{display:inline-block;font-size:12px;padding:2px 8px;border-radius:999px;border:1px solid var(--line)}
+.tag.s{background:var(--up);color:#fff;border:0}.tag.m{background:var(--ac);color:#111;border:0}
+.bar{height:6px;background:var(--line);border-radius:3px;overflow:hidden;align-self:center}.bar i{display:block;height:100%;background:var(--bl)}
+.kv{display:grid;grid-template-columns:auto 1fr;gap:3px 12px;font-size:14px}.kv b{text-align:right;font-variant-numeric:tabular-nums}
+label{display:block;font-size:13px;color:var(--mu);margin:8px 0 3px}
+input,select{width:100%;background:var(--bg);color:var(--tx);border:1px solid var(--line);border-radius:8px;padding:8px;font:inherit}
+input[type=range]{padding:0}input[type=checkbox]{width:auto}
+.btn{border:0;background:var(--bl);color:#fff;padding:8px 14px;border-radius:8px;font:inherit;cursor:pointer}.btn.g{background:var(--line);color:var(--tx)}
+.tw{overflow-x:auto}table{border-collapse:collapse;width:100%;font-size:13px}
+th,td{border-bottom:1px solid var(--line);padding:6px;text-align:right;white-space:nowrap}th{color:var(--mu);font-weight:500}
+td:first-child,th:first-child,td:nth-child(2),th:nth-child(2){text-align:left}
+tr.click{cursor:pointer}tr.click:hover{background:var(--bg)}
+.warn{border-left:3px solid var(--ac);padding:8px 12px;background:var(--card);border-radius:6px;font-size:13px;color:var(--mu);margin-top:8px}
+.probs{display:flex;gap:4px}.probs div{flex:1;text-align:center;border-radius:6px;padding:4px 0;font-size:12px;background:var(--bg)}
+.hide{display:none}svg text{fill:var(--mu);font-size:11px}
+.lg{display:flex;gap:14px;flex-wrap:wrap;font-size:13px}.lg span:before{content:"";display:inline-block;width:10px;height:3px;margin-right:5px;vertical-align:middle;background:var(--c)}
+</style>
+</head>
+<body>
+<header>
+<h1>台股三維選股</h1>
+<div class="sub" id="status">載入資料中…</div>
+</header>
+<nav id="nav">
+<button data-t="picks" class="on">今日精選</button>
+<button data-t="all">全市場</button>
+<button data-t="detail">個股分析</button>
+<button data-t="plan">資產試算</button>
+<button data-t="set">設定</button>
+</nav>
+<main>
+<div class="warn">分數、價位與漲跌機率皆由公開規則計算，屬量化參考，<b>不是投資建議</b>，也未經歷史回測驗證。投資有風險，請自行判斷。</div>
+
+<section id="t-picks">
+<div class="card"><div class="row"><div><div class="mu">投入資金</div><div class="big" id="sCap"></div></div><div style="text-align:right"><div class="mu">風險偏好 · 天數 · 流動性</div><div id="sRisk"></div></div></div></div>
+<div class="grid" id="pickList"></div>
+</section>
+
+<section id="t-all" class="hide">
+<div class="card g3">
+<div style="grid-column:1/-1"><input id="q" placeholder="搜尋代號或名稱，例如 2330、聯發科"></div>
+<div><label>市場</label><select id="fMkt"><option value="">全部</option><option value="L">上市</option><option value="O">上櫃</option></select></div>
+<div><label>產業</label><select id="fInd"><option value="">全部產業</option></select></div>
+<div><label>排序</label><select id="fSort"><option value="comp">綜合分數</option><option value="c">籌碼面</option><option value="f">基本面</option><option value="t">技術面</option><option value="pH">上漲機率</option><option value="chg">今日漲跌</option><option value="lots">成交量</option></select></div>
+<div><label>最低 20 日均量（張）</label><input id="fLots" type="number" value="0"></div>
+</div>
+<div class="mu" id="allInfo"></div>
+<div class="card tw" style="padding:6px"><table id="allTbl"></table></div>
+<div style="text-align:center"><button class="btn g" id="more">顯示更多</button></div>
+</section>
+
+<section id="t-detail" class="hide">
+<div class="card"><input id="dq" placeholder="輸入代號或名稱後按 Enter" list="dl"><datalist id="dl"></datalist></div>
+<div id="detailBox"><div class="card mu">從「今日精選」或「全市場」點選個股，或在上方輸入。</div></div>
+</section>
+
+<section id="t-plan" class="hide">
+<div class="card g3">
+<div><label>初始資金（元）</label><input id="pInit" type="number"></div>
+<div><label>每月投入（元）</label><input id="pMon" type="number"></div>
+<div><label>試算年數</label><input id="pYrs" type="number" min="1" max="40"></div>
+<div><label>保守年報酬 %</label><input id="pR1" type="number" step="0.5"></div>
+<div><label>基準年報酬 %</label><input id="pR2" type="number" step="0.5"></div>
+<div><label>樂觀年報酬 %</label><input id="pR3" type="number" step="0.5"></div>
+</div>
+<div class="card"><div class="lg" id="pLg"></div><svg id="pChart" viewBox="0 0 640 280" width="100%"></svg></div>
+<div class="card tw"><table id="pTbl"></table></div>
+</section>
+
+<section id="t-set" class="hide">
+<div class="card">
+<label>預計投入資金（元）</label><input id="cap" type="number" step="10000">
+<label>風險偏好</label><select id="risk"><option value="c">保守（停損窄、目標近）</option><option value="b">穩健</option><option value="a">積極（停損寬、目標遠）</option></select>
+<label>預測／持有天數：<b id="hzV"></b> 個交易日</label><input id="hz" type="range" min="1" max="20">
+<label>單筆最大風險（佔總資金 %）：<b id="rpV"></b></label><input id="rp" type="range" min="0.5" max="5" step="0.5">
+<label>每日精選檔數</label><input id="maxN" type="number" min="1" max="20">
+<label>入選門檻（綜合分數 ≥）</label><input id="th" type="number" min="40" max="95">
+<label>精選最低 20 日均量（張，過濾冷門股）</label><input id="minLots" type="number" step="100">
+<label>精選股價上限（元，0＝不限）</label><input id="maxPx" type="number">
+<label><input id="etf" type="checkbox"> 精選包含 ETF</label>
+<label><input id="mktL" type="checkbox"> 包含上市　<input id="mktO" type="checkbox"> 包含上櫃</label>
+</div>
+<div class="card">
+<div class="mu">三面向權重（自動正規化）</div>
+<label>籌碼面：<b id="wcV"></b></label><input id="wc" type="range" min="0" max="100">
+<label>基本面：<b id="wfV"></b></label><input id="wf" type="range" min="0" max="100">
+<label>技術面：<b id="wtV"></b></label><input id="wt" type="range" min="0" max="100">
+<div style="margin-top:10px"><button class="btn g" id="resetSet">還原預設設定</button></div>
+</div>
+<div class="card mu" style="font-size:13px">
+<b style="color:var(--tx)">計算方式</b><br>
+・籌碼面：外資／投信連續買賣超天數、三大法人 5 日買超占成交量比、融資 5 日增減（融資大增扣分）。<br>
+・基本面：本益比、殖利率、ROE（股價淨值比 ÷ 本益比推算）、單月營收年增、累計營收年增。ETF 基本面固定 50。<br>
+・技術面：收盤與 MA20、MA20 與 MA60 排列、RSI14、KD、MACD 柱、量比；RSI&gt;80 過熱扣分。<br>
+・上漲機率：每日漂移 μ =（綜合分數 − 50）÷ 50 × 0.12%，配合 60 日年化波動 σ，P = Φ(μT ÷ σ√T)。<br>
+・價位：波動幅度 m = σ日 × √天數；停損距離 = m × 係數（保守 1.0／穩健 1.3／積極 1.6，限 3–15%）；目標 = 進場 ×（1 + 停損距離 × 報酬風險比 1.5／2／2.5），依台股升降單位取整。<br>
+・部位：每檔 = min(資金 ÷ 檔數, 資金 × 單筆風險% ÷ 停損距離)，含手續費 0.1425%、證交稅 0.3%（ETF 0.1%）。
+</div>
+</section>
+</main>
+
+<script>
+const DEF={cap:1000000,risk:"b",hz:5,rp:1.5,maxN:6,th:62,minLots:1000,maxPx:0,etf:false,mktL:true,mktO:true,wc:35,wf:30,wt:35,pInit:1000000,pMon:20000,pYrs:10,pR1:4,pR2:8,pR3:12};
+const RISK={c:{n:"保守",k:1.0,rr:1.5},b:{n:"穩健",k:1.3,rr:2},a:{n:"積極",k:1.6,rr:2.5}};
+let S=Object.assign({},DEF);try{Object.assign(S,JSON.parse(localStorage.getItem("tws2")||"{}"))}catch(e){}
+const save=()=>{try{localStorage.setItem("tws2",JSON.stringify(S))}catch(e){}};
+const $=id=>document.getElementById(id);
+const cl=(x,a,b)=>Math.max(a,Math.min(b,x));
+const ok=x=>x!==null&&x!==undefined&&!Number.isNaN(x);
+const lin=(x,x0,x1,y0,y1)=>ok(x)?y0+(cl(x,Math.min(x0,x1),Math.max(x0,x1))-x0)/(x1-x0)*(y1-y0):0;
+const fmt=n=>Math.round(n).toLocaleString("zh-TW");
+const pct=n=>(n*100).toFixed(1)+"%";
+const sh=x=>ok(x)?x:"—";
+function tick(p){return p<10?.01:p<50?.05:p<100?.1:p<500?.5:p<1000?1:5}
+function rt(p,m){const t=tick(p);const v=m==="dn"?Math.floor(p/t+1e-9)*t:m==="up"?Math.ceil(p/t-1e-9)*t:Math.round(p/t)*t;return +v.toFixed(2)}
+function Phi(x){const t=1/(1+.2316419*Math.abs(x)),d=.3989423*Math.exp(-x*x/2),p=d*t*(.3193815+t*(-.3565638+t*(1.781478+t*(-1.821256+t*1.330274))));return x>0?1-p:p}
+let DATA=null,ALL=[];
+
+function scores(s){
+ let c=50+lin(s.fs,-5,5,-15,15)+lin(s.ts,-5,5,-15,15)+lin(s.inst,-5,5,-15,15)+lin(s.margin,-5,5,8,-8);
+ let f=50;
+ if(s.etf)f=50;else{
+  f+=ok(s.pe)&&s.pe>0?lin(s.pe,10,40,10,-10):(ok(s.pe)?0:-5);
+  f+=lin(s.yld,0,6,0,8)+lin(s.roe,0,25,-10,15)+lin(s.rev,-20,50,-10,10)+lin(s.revc,-20,50,-8,12);
+ }
+ let t=50;
+ if(ok(s.ma20))t+=s.close>=s.ma20?8:-8;
+ if(ok(s.ma20)&&ok(s.ma60))t+=s.ma20>=s.ma60?10:-10;
+ if(ok(s.rsi))t+=s.rsi>80?-10:s.rsi>=50?lin(s.rsi,50,70,4,10):s.rsi<30?4:lin(s.rsi,30,50,-6,0);
+ if(ok(s.k))t+=s.k>85?-6:s.k>=50?(ok(s.d)&&s.k>=s.d?6:3):s.k<20?3:-4;
+ if(ok(s.macd))t+=s.macd>0?8:-8;
+ if(ok(s.vr)&&ok(s.chg))t+=s.vr>1.5?(s.chg>0?4:-4):0;
+ c=cl(c,0,100);f=cl(f,0,100);t=cl(t,0,100);
+ const ws=S.wc+S.wf+S.wt||1;
+ return{c,f,t,comp:(c*S.wc+f*S.wf+t*S.wt)/ws};
+}
+function analyze(s){
+ const sc=scores(s),R=RISK[S.risk],H=+S.hz;
+ const sd=(ok(s.vol)&&s.vol>0?s.vol:40)/100/Math.sqrt(252),mu=(sc.comp-50)/50*0.0012;
+ const prob=T=>Phi(mu*T/(sd*Math.sqrt(T)));
+ const m=sd*Math.sqrt(H),stopPct=cl(m*R.k,.03,.15);
+ const entry=rt(s.close*(1-0.25*m),"dn");
+ const lo=s.close*(1-0.6*m);
+ const buyLo=rt(ok(s.ma20)&&s.ma20<s.close&&s.ma20>lo?s.ma20:lo,"dn");
+ const stop=rt(entry*(1-stopPct),"dn"),target=rt(entry*(1+stopPct*R.rr),"up");
+ const alloc=Math.min(S.cap/Math.max(1,S.maxN),S.cap*S.rp/100/stopPct);
+ const shs=Math.max(0,Math.floor(alloc/(entry*1.001425)));
+ const tax=s.etf?0.001:0.003,cost=shs*entry*1.001425,net=p=>shs*p*(1-0.001425-tax);
+ const exp=mu*H,range=[s.close*Math.exp(exp-m),s.close*Math.exp(exp+m)];
+ const lvl=sc.comp>=72?["強力關注","s"]:sc.comp>=S.th?["關注","m"]:sc.comp>=45?["觀望",""]:["偏弱",""];
+ return{s,sc,prob,pH:prob(H),entry,buyLo,stop,target,stopPct,shs,lots:Math.floor(shs/1000),odd:shs%1000,cost,gain:net(target)-cost,loss:net(stop)-cost,range,lvl};
+}
+function reasons(a){
+ const s=a.s,r=[];
+ if(s.fs>=3)r.push(`外資連買${s.fs}日`);else if(s.fs<=-3)r.push(`外資連賣${-s.fs}日`);
+ if(s.ts>=3)r.push(`投信連買${s.ts}日`);else if(s.ts<=-3)r.push(`投信連賣${-s.ts}日`);
+ if(ok(s.margin)&&s.margin>=5)r.push("融資大增");
+ if(ok(s.rev)&&s.rev>=30)r.push(`月營收年增${s.rev}%`);if(ok(s.revc)&&s.revc>=20)r.push(`累計營收年增${s.revc}%`);
+ if(ok(s.pe)&&s.pe>40)r.push(`本益比${s.pe}倍偏高`);
+ if(ok(s.ma60)&&s.close>=s.ma20&&s.ma20>=s.ma60)r.push("均線多頭排列");else if(ok(s.ma60)&&s.close<s.ma20&&s.ma20<s.ma60)r.push("均線空頭排列");
+ if(ok(s.rsi)&&s.rsi>80)r.push("RSI過熱");else if(ok(s.rsi)&&s.rsi<30)r.push("RSI超賣");
+ if(ok(s.vr)&&s.vr>2)r.push(`量增${s.vr}倍`);
+ return r.slice(0,5).join("、")||"指標中性";
+}
+const bar=v=>`<div class="bar"><i style="width:${v}%"></i></div>`;
+function probRow(a){return `<div class="probs">${[1,3,5,10,20].map(T=>{const p=a.prob(T);return `<div><div class="mu">${T}日</div><b class="${p>=.5?"up":"dn"}">${pct(p)}</b></div>`}).join("")}</div>`}
+function spark(arr,ma){
+ if(!arr||arr.length<2)return"";const W=600,H=140,P=6,mx=Math.max(...arr),mn=Math.min(...arr),rg=mx-mn||1;
+ const X=i=>P+i/(arr.length-1)*(W-2*P),Y=v=>H-P-(v-mn)/rg*(H-2*P);
+ const up=arr[arr.length-1]>=arr[0];
+ let ma20="";if(arr.length>=20){const pts=[];for(let i=19;i<arr.length;i++){let s=0;for(let j=i-19;j<=i;j++)s+=arr[j];pts.push(X(i)+","+Y(s/20))}ma20=`<polyline fill="none" stroke="var(--ac)" stroke-width="1.5" stroke-dasharray="4 3" points="${pts.join(" ")}"/>`}
+ return `<svg viewBox="0 0 ${W} ${H}" width="100%"><polyline fill="none" stroke="${up?"var(--up)":"var(--dn)"}" stroke-width="2" points="${arr.map((v,i)=>X(i)+","+Y(v)).join(" ")}"/>${ma20}<text x="${W-4}" y="12" text-anchor="end">${mx}</text><text x="${W-4}" y="${H-2}" text-anchor="end">${mn}</text></svg><div class="mu">近 ${arr.length} 日收盤（虛線為 MA20）</div>`;
+}
+const mk=s=>s.mkt==="L"?"上市":"上櫃";
+function pickCard(a,i){
+ const s=a.s;
+ return `<div class="card">
+ <div class="row"><div>${i!=null?`<span class="mu">#${i+1}</span> `:""}<b style="font-size:17px;cursor:pointer" onclick="openDetail('${s.code}')">${s.name}</b> <span class="mu">${s.code} · ${mk(s)}${s.ind?" · "+s.ind:""}</span></div><span class="tag ${a.lvl[1]}">${a.lvl[0]}</span></div>
+ <div class="row" style="margin:6px 0"><div><span class="big">${s.close}</span> <span class="${s.chg>=0?"up":"dn"}">${s.chg>=0?"+":""}${sh(s.chg)}%</span></div><div style="text-align:right"><div class="mu">綜合分數</div><div class="big" style="color:var(--ac)">${a.sc.comp.toFixed(0)}</div></div></div>
+ <div class="kv"><span class="mu">籌碼 ${a.sc.c.toFixed(0)}</span>${bar(a.sc.c)}<span class="mu">基本 ${a.sc.f.toFixed(0)}</span>${bar(a.sc.f)}<span class="mu">技術 ${a.sc.t.toFixed(0)}</span>${bar(a.sc.t)}</div>
+ <div class="mu" style="margin:8px 0">${reasons(a)}</div>
+ <div class="kv"><span>建議買入區</span><b>${a.buyLo} – ${s.close}</b><span>參考進場價</span><b>${a.entry}</b><span>目標賣出價</span><b class="up">${a.target}</b><span>停損價</span><b class="dn">${a.stop}（-${pct(a.stopPct)}）</b><span>建議股數</span><b>${a.lots} 張 ${a.odd} 股</b><span>投入金額</span><b>${fmt(a.cost)}</b><span>達標損益</span><b class="up">+${fmt(a.gain)}</b><span>停損損益</span><b class="dn">${fmt(a.loss)}</b></div>
+ <div class="mu" style="margin:8px 0 4px">未來上漲機率（模型估計）</div>${probRow(a)}
+ </div>`;
+}
+function computeAll(){ALL=DATA.stocks.map(analyze)}
+function renderPicks(){
+ $("sCap").textContent=fmt(S.cap)+" 元";$("sRisk").textContent=`${RISK[S.risk].n} · ${S.hz}日 · ≥${fmt(S.minLots)}張`;
+ const picks=ALL.filter(a=>{const s=a.s;return a.sc.comp>=S.th&&(s.lots||0)>=S.minLots&&(S.etf||!s.etf)&&(s.mkt==="L"?S.mktL:S.mktO)&&(!S.maxPx||s.close<=S.maxPx)&&ok(s.ma20)})
+  .sort((x,y)=>y.sc.comp-x.sc.comp).slice(0,S.maxN);
+ $("pickList").innerHTML=picks.length?picks.map(pickCard).join(""):`<div class="card mu">今天沒有個股符合條件（分數 ≥ ${S.th}、均量 ≥ ${S.minLots} 張）。可到「設定」放寬門檻。</div>`;
+}
+let page=1;
+function renderAll(){
+ const q=$("q").value.trim(),mkt=$("fMkt").value,ind=$("fInd").value,srt=$("fSort").value,ml=+$("fLots").value||0;
+ let L=ALL.filter(a=>{const s=a.s;return(!q||s.code.includes(q)||s.name.includes(q))&&(!mkt||s.mkt===mkt)&&(!ind||s.ind===ind)&&(s.lots||0)>=ml});
+ const key=a=>srt==="pH"?a.pH:srt==="chg"?(a.s.chg??-99):srt==="lots"?(a.s.lots||0):srt==="comp"?a.sc.comp:a.sc[srt];
+ L.sort((x,y)=>key(y)-key(x));
+ $("allInfo").textContent=`共 ${L.length} 檔`;
+ let h=`<tr><th>代號</th><th>名稱</th><th>收盤</th><th>漲跌%</th><th>綜合</th><th>籌碼</th><th>基本</th><th>技術</th><th>${S.hz}日漲率</th><th>均量(張)</th></tr>`;
+ L.slice(0,page*50).forEach(a=>{const s=a.s;h+=`<tr class="click" onclick="openDetail('${s.code}')"><td>${s.code}</td><td>${s.name}</td><td>${s.close}</td><td class="${s.chg>=0?"up":"dn"}">${sh(s.chg)}</td><td><b>${a.sc.comp.toFixed(0)}</b></td><td>${a.sc.c.toFixed(0)}</td><td>${a.sc.f.toFixed(0)}</td><td>${a.sc.t.toFixed(0)}</td><td class="${a.pH>=.5?"up":"dn"}">${pct(a.pH)}</td><td>${fmt(s.lots||0)}</td></tr>`});
+ $("allTbl").innerHTML=h;$("more").classList.toggle("hide",L.length<=page*50);
+}
+let curCode=null;
+function openDetail(code){curCode=code;tab("detail");renderDetail()}
+function renderDetail(){
+ const a=ALL.find(x=>x.s.code===curCode);if(!a)return;const s=a.s;
+ const it=(k,v,n)=>`<span>${k}</span><b>${v}${n?` <span class="mu">${n}</span>`:""}</b>`;
+ let days="";for(let T=1;T<=Math.max(10,S.hz);T++){const p=a.prob(T);days+=`<tr><td>第 ${T} 日</td><td></td><td class="${p>=.5?"up":"dn"}">${pct(p)}</td><td>${pct(1-p)}</td></tr>`}
+ $("detailBox").innerHTML=`${pickCard(a,null)}
+ <div class="card">${spark(s.spark)}</div>
+ <div class="grid">
+ <div class="card"><div class="row"><b>籌碼面</b><b>${a.sc.c.toFixed(0)}</b></div><div class="kv" style="margin-top:6px">
+ ${it("外資連續",s.fs+" 日",s.fs>0?"買超":s.fs<0?"賣超":"")}${it("投信連續",s.ts+" 日",s.ts>0?"買超":s.ts<0?"賣超":"")}${it("法人5日買超比",sh(s.inst)+"%")}${it("融資5日變化",sh(s.margin)+"%")}</div></div>
+ <div class="card"><div class="row"><b>基本面</b><b>${a.sc.f.toFixed(0)}</b></div><div class="kv" style="margin-top:6px">
+ ${it("本益比",sh(s.pe))}${it("股價淨值比",sh(s.pb))}${it("ROE（推算）",sh(s.roe)+"%")}${it("殖利率",sh(s.yld)+"%")}${it("單月營收年增",sh(s.rev)+"%")}${it("累計營收年增",sh(s.revc)+"%")}</div></div>
+ <div class="card"><div class="row"><b>技術面</b><b>${a.sc.t.toFixed(0)}</b></div><div class="kv" style="margin-top:6px">
+ ${it("MA5 / MA20",sh(s.ma5)+" / "+sh(s.ma20))}${it("MA60",sh(s.ma60))}${it("RSI14",sh(s.rsi))}${it("K / D",sh(s.k)+" / "+sh(s.d))}${it("MACD 柱",sh(s.macd))}${it("量比",sh(s.vr))}${it("年化波動",sh(s.vol)+"%")}${it("60日高 / 低",sh(s.hi60)+" / "+sh(s.lo60))}</div></div>
+ </div>
+ <div class="card"><b>${S.hz} 日後股價區間（約 68% 機率）</b><div class="big" style="margin:4px 0">${rt(a.range[0])} – ${rt(a.range[1])}</div></div>
+ <div class="card tw"><b>逐日漲跌機率</b><table style="margin-top:6px"><tr><th>持有至</th><th></th><th>收高於今日</th><th>收低於今日</th></tr>${days}</table></div>`;
+ window.scrollTo(0,0);
+}
+function renderPlan(){
+ const yrs=cl(+S.pYrs||10,1,40),rs=[S.pR1,S.pR2,S.pR3],cols=["#8b98a5","#60a5fa","#ef4444"],nm=["保守","基準","樂觀"];
+ const ser=rs.map(r=>{const mr=Math.pow(1+r/100,1/12)-1;let v=+S.pInit,o=[v];for(let m=1;m<=yrs*12;m++){v=v*(1+mr)+(+S.pMon);if(m%12===0)o.push(v)}return o});
+ const pr=[];for(let y=0;y<=yrs;y++)pr.push(+S.pInit+S.pMon*12*y);
+ const W=640,H=280,L=60,B=30,T=10,R=10,mx=Math.max(...ser.flat(),...pr,1);
+ const X=i=>L+i/yrs*(W-L-R),Y=v=>H-B-v/mx*(H-B-T);
+ let g="";for(let i=0;i<=4;i++){const v=mx*i/4;g+=`<line x1="${L}" x2="${W-R}" y1="${Y(v)}" y2="${Y(v)}" stroke="currentColor" opacity=".12"/><text x="${L-6}" y="${Y(v)+4}" text-anchor="end">${v>=1e8?(v/1e8).toFixed(1)+"億":(v/1e4).toFixed(0)+"萬"}</text>`}
+ const st=Math.ceil(yrs/8);for(let y=0;y<=yrs;y+=st)g+=`<text x="${X(y)}" y="${H-10}" text-anchor="middle">${y}年</text>`;
+ const pl=(a,c,d)=>`<polyline fill="none" stroke="${c}" stroke-width="2.5" ${d?'stroke-dasharray="5 4"':""} points="${a.map((v,i)=>X(i)+","+Y(v)).join(" ")}"/>`;
+ g+=pl(pr,"#f5b942",1);ser.forEach((s,i)=>g+=pl(s,cols[i]));$("pChart").innerHTML=g;
+ $("pLg").innerHTML=`<span style="--c:#f5b942">累計本金</span>`+nm.map((n,i)=>`<span style="--c:${cols[i]}">${n} ${rs[i]}%</span>`).join("");
+ let h=`<tr><th>年</th><th>累計本金</th><th>保守</th><th>基準</th><th>樂觀</th></tr>`;
+ for(let y=1;y<=yrs;y++){if(yrs>15&&y%5&&y!==yrs&&y>3)continue;h+=`<tr><td>${y}</td><td>${fmt(pr[y])}</td>${ser.map(s=>`<td>${fmt(s[y])}</td>`).join("")}</tr>`}
+ $("pTbl").innerHTML=h;
+}
+function refresh(){if(!DATA)return;computeAll();renderPicks();renderAll();if(curCode)renderDetail()}
+function tab(t){document.querySelectorAll("#nav button").forEach(x=>x.classList.toggle("on",x.dataset.t===t));document.querySelectorAll("main section").forEach(s=>s.classList.toggle("hide",s.id!=="t-"+t))}
+document.querySelectorAll("#nav button").forEach(b=>b.onclick=()=>{tab(b.dataset.t);window.scrollTo(0,0)});
+const ids=["cap","risk","hz","rp","maxN","th","minLots","maxPx","etf","mktL","mktO","wc","wf","wt","pInit","pMon","pYrs","pR1","pR2","pR3"];
+function syncLabels(){$("hzV").textContent=S.hz;$("rpV").textContent=S.rp+"%";const ws=S.wc+S.wf+S.wt||1;["wc","wf","wt"].forEach(k=>$(k+"V").textContent=Math.round(S[k]/ws*100)+"%")}
+function loadForm(){ids.forEach(id=>{const el=$(id);if(el.type==="checkbox")el.checked=!!S[id];else el.value=S[id]})}
+ids.forEach(id=>{const el=$(id);el.addEventListener("input",()=>{S[id]=el.type==="checkbox"?el.checked:id==="risk"?el.value:+el.value;syncLabels();save();if(id.startsWith("p"))renderPlan();else refresh()})});
+$("resetSet").onclick=()=>{S=Object.assign({},DEF);save();loadForm();syncLabels();renderPlan();refresh()};
+["q","fMkt","fInd","fSort","fLots"].forEach(id=>$(id).addEventListener("input",()=>{page=1;renderAll()}));
+$("more").onclick=()=>{page++;renderAll()};
+$("dq").addEventListener("change",e=>{const v=e.target.value.trim().split(" ")[0];const a=ALL.find(x=>x.s.code===v||x.s.name===v);if(a)openDetail(a.s.code)});
+loadForm();syncLabels();renderPlan();
+fetch("data/latest.json?"+Date.now()).then(r=>r.json()).then(d=>{
+ DATA=d;const nL=d.stocks.filter(s=>s.mkt==="L").length;
+ $("status").textContent=`資料日期 ${d.date} · 上市 ${nL} 檔、上櫃 ${d.count-nL} 檔 · 使用 ${d.days} 個交易日`+(d.days<60?"（歷史不足 60 日，MA60 等指標尚未完整）":"");
+ const inds=[...new Set(d.stocks.map(s=>s.ind).filter(Boolean))].sort();$("fInd").innerHTML+=inds.map(x=>`<option>${x}</option>`).join("");
+ $("dl").innerHTML=d.stocks.map(s=>`<option value="${s.code} ${s.name}">`).join("");
+ refresh();
+}).catch(e=>{$("status").textContent="無法載入資料：請確認已執行過 GitHub Actions 的第一次回補。"});
+</script>
+</body>
+</html>
