@@ -1,0 +1,12 @@
+name: 測試資料來源
+on:
+  push:
+    paths: ["scripts/probe.py"]
+  workflow_dispatch:
+jobs:
+  probe:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - run: pip install requests
+      - run: python scripts/probe.py
